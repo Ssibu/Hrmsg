@@ -2,7 +2,7 @@ const HRPolicy = require('../models/hrPolicy');
 
 exports.getAllPolicies = async (req, res) => {
   try {
-    const policies = await HRPolicy.findAll();
+    const policies = await HRPolicy.find();
     res.json(policies);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -20,9 +20,8 @@ exports.createPolicy = async (req, res) => {
 
 exports.updatePolicy = async (req, res) => {
   try {
-    const [updated] = await HRPolicy.update(req.body, { where: { id: req.params.id } });
-    if (updated) {
-      const updatedPolicy = await HRPolicy.findByPk(req.params.id);
+    const updatedPolicy = await HRPolicy.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (updatedPolicy) {
       res.json(updatedPolicy);
     } else {
       res.status(404).json({ error: 'Policy not found' });
@@ -34,7 +33,7 @@ exports.updatePolicy = async (req, res) => {
 
 exports.deletePolicy = async (req, res) => {
   try {
-    const deleted = await HRPolicy.destroy({ where: { id: req.params.id } });
+    const deleted = await HRPolicy.findByIdAndDelete(req.params.id);
     if (deleted) {
       res.json({ message: 'Policy deleted' });
     } else {

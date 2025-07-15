@@ -15,13 +15,13 @@ exports.register = async (req, res) => {
     if (!username || !password) {
       return res.status(400).json({ message: 'Username and password are required.' });
     }
-    const existing = await Admin.findOne({ where: { username } });
+    const existing = await Admin.findOne({ username });
     if (existing) {
       return res.status(409).json({ message: 'Username already exists.' });
     }
     const hash = await bcrypt.hash(password, 10);
     const admin = await Admin.create({ username, password: hash, phone, email });
-    res.status(201).json({ message: 'Admin registered successfully.', admin: { id: admin.id, username: admin.username } });
+    res.status(201).json({ message: 'Admin registered successfully.', admin: { id: admin._id, username: admin.username } });
   } catch (err) {
     res.status(500).json({ message: 'Registration failed.', error: err.message });
   }
@@ -30,7 +30,7 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     const { username, password } = req.body;
-    const admin = await Admin.findOne({ where: { username } });
+    const admin = await Admin.findOne({ username });
     if (!admin) {
       return res.status(401).json({ message: 'Invalid credentials.' });
     }
@@ -38,8 +38,8 @@ exports.login = async (req, res) => {
     if (!match) {
       return res.status(401).json({ message: 'Invalid credentials.' });
     }
-    const token = jwt.sign({ id: admin.id, username: admin.username, role: 'admin' }, JWT_SECRET, { expiresIn: '8h' });
-    res.json({ token, user: { id: admin.id, username: admin.username, role: 'admin' } });
+    const token = jwt.sign({ id: admin._id, username: admin.username, role: 'admin' }, JWT_SECRET, { expiresIn: '8h' });
+    res.json({ token, user: { id: admin._id, username: admin.username, role: 'admin' } });
   } catch (err) {
     res.status(500).json({ message: 'Login failed.', error: err.message });
   }
@@ -53,9 +53,9 @@ exports.resetPassword = async (req, res) => {
     }
     let admin;
     if (phone) {
-      admin = await Admin.findOne({ where: { username, phone } });
+      admin = await Admin.findOne({ username, phone });
     } else if (email) {
-      admin = await Admin.findOne({ where: { username, email } });
+      admin = await Admin.findOne({ username, email });
     }
     if (!admin) {
       return res.status(404).json({ message: 'Admin not found or phone/email does not match.' });

@@ -1,5 +1,4 @@
 const Task = require('../models/task');
-const { Op } = require('sequelize');
 
 function timeToSeconds(timeStr) {
   // timeStr: 'HH:MM:SS'
@@ -66,7 +65,7 @@ exports.createTask = async (req, res) => {
 exports.updateTask = async (req, res) => {
   try {
     const { id } = req.params;
-    const task = await Task.findByPk(id);
+    const task = await Task.findById(id);
     if (!task) return res.status(404).json({ error: 'Task not found' });
 
     let rating = task.rating;
@@ -80,18 +79,17 @@ exports.updateTask = async (req, res) => {
       newStatusHistory.push({ status: req.body.status, timestamp: new Date().toISOString() });
     }
     
-    const oldStatus = task.status;
-    await task.update({
+    await Task.findByIdAndUpdate(id, {
       ...req.body,
       rating,
       status: req.body.status || task.status,
       status_history: newStatusHistory,
-    });
+    }, { new: true });
     
     // Broadcast task update to all clients
     broadcastTaskUpdate('task_updated', task);
     
-    res.json(task);
+    res.json(await Task.findById(id));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
@@ -101,13 +99,13 @@ exports.updateTask = async (req, res) => {
 exports.deleteTask = async (req, res) => {
   try {
     const { id } = req.params;
-    const task = await Task.findByPk(id);
+    const task = await Task.findById(id);
     if (!task) return res.status(404).json({ error: 'Task not found' });
     
     // Broadcast task deletion before deleting
-    broadcastTaskUpdate('task_deleted', { id: task.id });
+    broadcastTaskUpdate('task_deleted', { id: task._id });
     
-    await task.destroy();
+    await Task.findByIdAndDelete(id);
     res.json({ message: 'Task deleted successfully' });
   } catch (err) {
     console.error(err);
@@ -120,16 +118,14 @@ exports.getAllTasks = async (req, res) => {
     let tasks;
     if (req.query.employee_id) {
       // Return both tasks assigned to this employee and all unassigned tasks
-      tasks = await Task.findAll({
-        where: {
-          [Op.or]: [
-            { employee_id: req.query.employee_id },
-            { employee_id: null }
-          ]
-        }
+      tasks = await Task.find({
+        $or: [
+          { employee_id: req.query.employee_id },
+          { employee_id: null }
+        ]
       });
     } else {
-      tasks = await Task.findAll();
+      tasks = await Task.find();
     }
     res.json(tasks);
   } catch (err) {
@@ -143,20 +139,20 @@ exports.claimTask = async (req, res) => {
   try {
     const { id } = req.params;
     let { employee_id, estimated_time } = req.body;
-    const task = await Task.findByPk(id);
+    const task = await Task.findById(id);
     if (!task) return res.status(404).json({ error: 'Task not found' });
     if (task.employee_id) return res.status(400).json({ error: 'Task already claimed' });
     // Convert HH:MM to HH:MM:00 if needed
     if (estimated_time && /^\d{2}:\d{2}$/.test(estimated_time)) {
       estimated_time = estimated_time + ':00';
     }
-    await task.update({ 
-      employee_id, 
+    await Task.findByIdAndUpdate(id, {
+      employee_id,
       status: 'pending', // Let employee explicitly start the timer
       ...(estimated_time && { estimated_time })
-    });
-    broadcastTaskUpdate('task_updated', task);
-    res.json(task);
+    }, { new: true });
+    broadcastTaskUpdate('task_updated', await Task.findById(id));
+    res.json(await Task.findById(id));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
